@@ -1,0 +1,24 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Publish to GitHub Packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish
+        uses: whilesmart/workflows/js/publish@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          scope: '@whilesmart'
+          install: 'true'
+          verify_command: npm test
