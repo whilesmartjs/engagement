@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -17,7 +18,7 @@ jobs:
       - name: Publish
         uses: whilesmart/workflows/js/publish@v1
         with:
-          token: ${{ secrets.NPM_TOKEN }}
+          trusted: 'true'
           registry: https://registry.npmjs.org
           access: public
           scope: '@whilesmart'
