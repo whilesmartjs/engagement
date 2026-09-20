@@ -8,17 +8,18 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   release:
-    name: Publish to GitHub Packages
+    name: Publish to npm
     runs-on: ubuntu-latest
     steps:
       - name: Publish
         uses: whilesmart/workflows/js/publish@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.NPM_TOKEN }}
+          registry: https://registry.npmjs.org
+          access: public
           scope: '@whilesmart'
           install: 'true'
           verify_command: npm test
