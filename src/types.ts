@@ -24,11 +24,37 @@ export interface TrackOptions {
   source?: string
 }
 
+export interface EngagementPerson {
+  id: string
+  properties?: EngagementProperties
+}
+
+export interface DestinationContext {
+  visitorId: string
+  sessionId: string
+}
+
+/**
+ * Another analytics service that receives what the client records. Every
+ * method is optional, and a destination that throws never stops the others or
+ * the client's own delivery.
+ */
+export interface EngagementDestination {
+  name: string
+  start?(context: DestinationContext): void
+  page?(event: EngagementEvent): void
+  track?(event: EngagementEvent): void
+  identify?(person: EngagementPerson): void
+  reset?(): void
+}
+
 export interface EngagementClientOptions {
   endpoint: string
   siteKey: string
   consent?: () => boolean
+  destinations?: EngagementDestination[]
   autoPageViews?: boolean
+  autoLinkClicks?: boolean
   batchSize?: number
   flushInterval?: number
   fetch?: typeof globalThis.fetch
@@ -36,6 +62,7 @@ export interface EngagementClientOptions {
   sessionStorage?: Pick<Storage, 'getItem' | 'setItem'>
   location?: Pick<Location, 'href' | 'search'>
   document?: Pick<Document, 'referrer' | 'visibilityState' | 'addEventListener' | 'removeEventListener'>
+  onDestinationError?: (destination: string, error: unknown) => void
   navigator?: Pick<Navigator, 'sendBeacon'>
   crypto?: Pick<Crypto, 'randomUUID' | 'getRandomValues'>
 }
@@ -43,6 +70,8 @@ export interface EngagementClientOptions {
 export interface EngagementClient {
   page(properties?: EngagementProperties): void
   track(name: string, properties?: EngagementProperties, options?: TrackOptions): void
+  identify(person: EngagementPerson): void
+  reset(): void
   flush(useBeacon?: boolean): Promise<void>
   destroy(): Promise<void>
 }

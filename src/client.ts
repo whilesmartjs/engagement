@@ -1,7 +1,9 @@
 import type {
   EngagementClient,
   EngagementClientOptions,
+  EngagementDestination,
   EngagementEvent,
+  EngagementPerson,
   EngagementProperties,
   TrackOptions,
 } from './types.js'
@@ -21,7 +23,27 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
   const visitorId = persistentId(localStorage, visitorStorageKey, browserCrypto)
   const sessionId = persistentId(sessionStorage, sessionStorageKey, browserCrypto)
   const queue: EngagementEvent[] = []
+  const destinations = options.destinations ?? []
+  let started = false
   let flushing: Promise<void> | undefined
+
+  function deliver(call: (destination: EngagementDestination) => void): void {
+    if (!started) {
+      started = true
+      deliver((destination) => destination.start?.({ visitorId, sessionId }))
+    }
+    for (const destination of destinations) {
+      try {
+        call(destination)
+      } catch (error) {
+        options.onDestinationError?.(destination.name, error)
+      }
+    }
+  }
+
+  function consented(): boolean {
+    return !options.consent || options.consent()
+  }
 
   const onVisibilityChange = () => {
     if (browserDocument?.visibilityState === 'hidden') void flush(true)
@@ -32,7 +54,7 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
   const timer = globalThis.setInterval(() => void flush(), options.flushInterval ?? 5000)
 
   function track(name: string, properties?: EngagementProperties, eventOptions: TrackOptions = {}): void {
-    if (options.consent && !options.consent()) return
+    if (!consented()) return
 
     const event: EngagementEvent = {
       name,
@@ -56,12 +78,35 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
     if (properties && Object.keys(properties).length > 0) event.properties = properties
 
     queue.push(event)
+    deliver((destination) => (name === 'page.view' ? destination.page?.(event) : destination.track?.(event)))
     if (queue.length >= batchSize) void flush()
   }
 
   function page(properties?: EngagementProperties): void {
     track('page.view', properties)
   }
+
+  function identify(person: EngagementPerson): void {
+    if (!consented()) return
+    deliver((destination) => destination.identify?.(person))
+  }
+
+  function reset(): void {
+    deliver((destination) => destination.reset?.())
+  }
+
+  const onClick = (event: Event) => {
+    const link = event.target instanceof Element ? event.target.closest('a') : null
+    if (!link?.href) return
+    track('link.clicked', {
+      label: (link.textContent ?? '').trim().slice(0, 200),
+      destination: link.origin + link.pathname,
+      outbound: link.origin !== originOf(browserLocation?.href),
+    })
+    void flush(true).catch(() => {})
+  }
+
+  if (options.autoLinkClicks) browserDocument?.addEventListener('click', onClick)
 
   async function flush(useBeacon = false): Promise<void> {
     if (flushing) return flushing
@@ -102,12 +147,21 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
   async function destroy(): Promise<void> {
     globalThis.clearInterval(timer)
     browserDocument?.removeEventListener('visibilitychange', onVisibilityChange)
+    browserDocument?.removeEventListener('click', onClick)
     await flush()
   }
 
   if (options.autoPageViews !== false) page()
 
-  return { page, track, flush, destroy }
+  return { page, track, identify, reset, flush, destroy }
+}
+
+function originOf(href: string | undefined): string | undefined {
+  try {
+    return href ? new URL(href).origin : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function persistentId(storage: Pick<Storage, 'getItem' | 'setItem'> | undefined, key: string, crypto: Pick<Crypto, 'randomUUID' | 'getRandomValues'> | undefined): string {
