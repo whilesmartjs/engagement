@@ -2,7 +2,7 @@
 
 All notable changes to the WhileSmart engagement client are documented in this file.
 
-## [Unreleased]
+## [0.2.0] - 2026-10-22
 
 ### Added
 - Destinations: other analytics services receive every page view, event, sign-in and sign-out the client records, behind the same consent check, while the client keeps sending to its own endpoint
