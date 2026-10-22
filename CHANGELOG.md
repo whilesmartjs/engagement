@@ -12,6 +12,7 @@ All notable changes to the WhileSmart engagement client are documented in this f
 - `endpoint` and `siteKey` are optional: left out, events reach only the destinations
 
 ### Fixed
+- A batch the backend refuses during a scheduled flush is kept for the next attempt without surfacing as an unhandled error in the page
 - A flush made as the page is left sends at once instead of waiting behind a request already on its way, so the last events before a link is followed are not lost
 
 ## [0.1.0] - 2026-09-20

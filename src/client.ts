@@ -46,12 +46,18 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
   }
 
   const onVisibilityChange = () => {
-    if (browserDocument?.visibilityState === 'hidden') void flush(true)
+    if (browserDocument?.visibilityState === 'hidden') background(true)
   }
 
   browserDocument?.addEventListener('visibilitychange', onVisibilityChange)
 
-  const timer = globalThis.setInterval(() => void flush(), options.flushInterval ?? 5000)
+  // A failed batch is already back in the queue for the next attempt, so a
+  // flush nobody awaits has nothing to report.
+  function background(urgent = false): void {
+    flush(urgent).catch(() => {})
+  }
+
+  const timer = globalThis.setInterval(() => background(), options.flushInterval ?? 5000)
 
   function track(name: string, properties?: EngagementProperties, eventOptions: TrackOptions = {}): void {
     if (!consented()) return
@@ -79,7 +85,7 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
 
     queue.push(event)
     deliver((destination) => (name === 'page.view' ? destination.page?.(event) : destination.track?.(event)))
-    if (queue.length >= batchSize) void flush()
+    if (queue.length >= batchSize) background()
   }
 
   function page(properties?: EngagementProperties): void {
@@ -106,7 +112,7 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
     }
     if (withText) properties.label = (link.textContent ?? '').trim().slice(0, 200)
     track('link.clicked', properties)
-    void flush(true).catch(() => {})
+    background(true)
   }
 
   if (options.autoLinkClicks) browserDocument?.addEventListener('click', onClick)

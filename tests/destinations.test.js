@@ -204,6 +204,28 @@ test('a flush made as the page is left does not wait behind one already sending'
   await client.destroy()
 })
 
+test('a batch the backend refuses on its own schedule is kept, not thrown', async () => {
+  const unhandled = []
+  const record = (error) => unhandled.push(error)
+  process.on('unhandledRejection', record)
+  let attempts = 0
+  const client = createEngagementClient(clientOptions({
+    batchSize: 1,
+    fetch: async () => {
+      attempts += 1
+      return { ok: attempts > 1, status: attempts > 1 ? 202 : 403 }
+    },
+  }))
+
+  client.track('signup.clicked')
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  await client.destroy()
+  process.off('unhandledRejection', record)
+
+  assert.deepEqual(unhandled, [])
+  assert.equal(attempts, 2)
+})
+
 test('without an endpoint, events reach only the destinations', async () => {
   let requests = 0
   const { calls, destination } = recorder()
