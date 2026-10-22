@@ -55,7 +55,8 @@ export interface EngagementClientOptions {
   consent?: () => boolean
   destinations?: EngagementDestination[]
   autoPageViews?: boolean
-  autoLinkClicks?: boolean
+  /** `{ text: false }` records where a link goes but not what it says. */
+  autoLinkClicks?: boolean | { text: boolean }
   batchSize?: number
   flushInterval?: number
   fetch?: typeof globalThis.fetch

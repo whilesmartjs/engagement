@@ -129,6 +129,22 @@ test('link clicks are recorded when asked for', async () => {
   ])
 })
 
+test('link clicks can be recorded without what the link says', async () => {
+  const document = listeners()
+  const { calls, destination } = recorder()
+  const client = createEngagementClient(clientOptions({ destinations: [destination], document, autoLinkClicks: { text: false } }))
+
+  globalThis.Element ??= class {}
+  const link = Object.assign(Object.create(globalThis.Element.prototype), {
+    href: 'https://site.example/repositories/secret', origin: 'https://site.example', pathname: '/repositories/secret', textContent: 'acme/secret-repo',
+  })
+  link.closest = () => link
+  document.fire('click', { target: link })
+  await client.destroy()
+
+  assert.deepEqual(calls.at(-1), ['track', 'link.clicked', { destination: 'https://site.example/repositories/secret', outbound: false }])
+})
+
 test('posthog hears what arrived before its library loaded, in order', async () => {
   const calls = []
   let loaded

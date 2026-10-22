@@ -8,7 +8,7 @@ All notable changes to the WhileSmart engagement client are documented in this f
 - Destinations: other analytics services receive every page view, event, sign-in and sign-out the client records, behind the same consent check, while the client keeps sending to its own endpoint
 - A PostHog destination, loading `posthog-js` (an optional peer dependency) only once there is something to send
 - `identify` and `reset`, passed to every destination
-- `autoLinkClicks`, recording each link click with its text, destination and whether it leaves the site
+- `autoLinkClicks`, recording each link click with its text, destination and whether it leaves the site; `{ text: false }` leaves the text out
 - `endpoint` and `siteKey` are optional: left out, events reach only the destinations
 
 ### Fixed

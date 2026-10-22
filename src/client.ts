@@ -95,14 +95,17 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
     deliver((destination) => destination.reset?.())
   }
 
+  const withText = typeof options.autoLinkClicks !== 'object' || options.autoLinkClicks.text
+
   const onClick = (event: Event) => {
     const link = event.target instanceof Element ? event.target.closest('a') : null
     if (!link?.href) return
-    track('link.clicked', {
-      label: (link.textContent ?? '').trim().slice(0, 200),
+    const properties: EngagementProperties = {
       destination: link.origin + link.pathname,
       outbound: link.origin !== originOf(browserLocation?.href),
-    })
+    }
+    if (withText) properties.label = (link.textContent ?? '').trim().slice(0, 200)
+    track('link.clicked', properties)
     void flush(true).catch(() => {})
   }
 

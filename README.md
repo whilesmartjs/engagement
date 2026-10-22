@@ -25,7 +25,8 @@ engagement.track('signup.started', { plan: 'business' })
 The client records a random visitor ID in local storage and a random session ID in session storage. It derives source attribution from `utm_source`, then the referrer host, then `direct`. Events are batched, retried after failed requests, and flushed with `sendBeacon` when the page becomes hidden.
 
 Set `autoLinkClicks: true` to record every link click as `link.clicked`, with
-the link's text, where it goes, and whether it leaves the site.
+the link's text, where it goes, and whether it leaves the site. Use
+`{ text: false }` where link text can be private, such as inside an app.
 
 ## Other analytics services
 
