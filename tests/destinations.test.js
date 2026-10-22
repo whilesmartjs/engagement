@@ -165,3 +165,25 @@ test('posthog hears what arrived before its library loaded, in order', async () 
     ['reset'],
   ])
 })
+
+test('a flush made as the page is left does not wait behind one already sending', async () => {
+  const bodies = []
+  const pending = []
+  const client = createEngagementClient(clientOptions({
+    navigator: { sendBeacon: () => false },
+    fetch: (url, init) => {
+      bodies.push(JSON.parse(init.body).events.map((event) => event.name))
+      return new Promise((resolve) => pending.push(() => resolve({ ok: true, status: 202 })))
+    },
+  }))
+
+  client.track('link.clicked')
+  const first = client.flush(true)
+  client.track('signup.clicked')
+  const second = client.flush(true)
+
+  assert.deepEqual(bodies, [['link.clicked'], ['signup.clicked']])
+  for (const resolve of pending) resolve()
+  await Promise.all([first, second])
+  await client.destroy()
+})

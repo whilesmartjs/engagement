@@ -108,14 +108,19 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
 
   if (options.autoLinkClicks) browserDocument?.addEventListener('click', onClick)
 
-  async function flush(useBeacon = false): Promise<void> {
-    if (flushing) return flushing
+  /**
+   * An urgent flush is one made as the page is left, so it sends at once rather
+   * than waiting behind a request already on its way: by the time that one
+   * settles, the page may be gone along with whatever was still queued.
+   */
+  async function flush(urgent = false): Promise<void> {
+    if (flushing && !urgent) return flushing
     if (queue.length === 0) return
 
     const events = queue.splice(0, batchSize)
     const body = JSON.stringify({ site_key: options.siteKey, events })
 
-    if (useBeacon && browserNavigator?.sendBeacon?.(options.endpoint, new Blob([body], { type: 'application/json' }))) {
+    if (urgent && browserNavigator?.sendBeacon?.(options.endpoint, new Blob([body], { type: 'application/json' }))) {
       return
     }
 
@@ -124,7 +129,7 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
       throw new Error('No fetch implementation is available')
     }
 
-    flushing = fetcher(options.endpoint, {
+    const request = fetcher(options.endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -138,10 +143,11 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
       queue.unshift(...events)
       throw error
     }).finally(() => {
-      flushing = undefined
+      if (flushing === request) flushing = undefined
     })
 
-    return flushing
+    flushing = request
+    return request
   }
 
   async function destroy(): Promise<void> {
