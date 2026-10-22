@@ -49,8 +49,9 @@ export interface EngagementDestination {
 }
 
 export interface EngagementClientOptions {
-  endpoint: string
-  siteKey: string
+  /** Left out, events reach only the destinations. */
+  endpoint?: string
+  siteKey?: string
   consent?: () => boolean
   destinations?: EngagementDestination[]
   autoPageViews?: boolean

@@ -187,3 +187,24 @@ test('a flush made as the page is left does not wait behind one already sending'
   await Promise.all([first, second])
   await client.destroy()
 })
+
+test('without an endpoint, events reach only the destinations', async () => {
+  let requests = 0
+  const { calls, destination } = recorder()
+  const client = createEngagementClient(clientOptions({
+    endpoint: undefined,
+    siteKey: undefined,
+    destinations: [destination],
+    fetch: async () => {
+      requests += 1
+      return { ok: true, status: 202 }
+    },
+  }))
+
+  client.track('signup.clicked')
+  await client.flush()
+  await client.destroy()
+
+  assert.equal(requests, 0)
+  assert.deepEqual(calls.map(([kind]) => kind), ['start', 'track'])
+})

@@ -114,13 +114,18 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
    * settles, the page may be gone along with whatever was still queued.
    */
   async function flush(urgent = false): Promise<void> {
+    if (!options.endpoint) {
+      queue.length = 0
+      return
+    }
     if (flushing && !urgent) return flushing
     if (queue.length === 0) return
+    const endpoint = options.endpoint
 
     const events = queue.splice(0, batchSize)
     const body = JSON.stringify({ site_key: options.siteKey, events })
 
-    if (urgent && browserNavigator?.sendBeacon?.(options.endpoint, new Blob([body], { type: 'application/json' }))) {
+    if (urgent && browserNavigator?.sendBeacon?.(endpoint, new Blob([body], { type: 'application/json' }))) {
       return
     }
 
@@ -129,11 +134,11 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
       throw new Error('No fetch implementation is available')
     }
 
-    const request = fetcher(options.endpoint, {
+    const request = fetcher(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Engagement-Site-Key': options.siteKey,
+        'X-Engagement-Site-Key': options.siteKey ?? '',
       },
       body,
       keepalive: true,
