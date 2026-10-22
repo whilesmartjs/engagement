@@ -1,7 +1,9 @@
 import type {
   EngagementClient,
   EngagementClientOptions,
+  EngagementDestination,
   EngagementEvent,
+  EngagementPerson,
   EngagementProperties,
   TrackOptions,
 } from './types.js'
@@ -21,18 +23,43 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
   const visitorId = persistentId(localStorage, visitorStorageKey, browserCrypto)
   const sessionId = persistentId(sessionStorage, sessionStorageKey, browserCrypto)
   const queue: EngagementEvent[] = []
+  const destinations = options.destinations ?? []
+  let started = false
   let flushing: Promise<void> | undefined
 
+  function deliver(call: (destination: EngagementDestination) => void): void {
+    if (!started) {
+      started = true
+      deliver((destination) => destination.start?.({ visitorId, sessionId }))
+    }
+    for (const destination of destinations) {
+      try {
+        call(destination)
+      } catch (error) {
+        options.onDestinationError?.(destination.name, error)
+      }
+    }
+  }
+
+  function consented(): boolean {
+    return !options.consent || options.consent()
+  }
+
   const onVisibilityChange = () => {
-    if (browserDocument?.visibilityState === 'hidden') void flush(true)
+    if (browserDocument?.visibilityState === 'hidden') background(true)
   }
 
   browserDocument?.addEventListener('visibilitychange', onVisibilityChange)
 
-  const timer = globalThis.setInterval(() => void flush(), options.flushInterval ?? 5000)
+  // A failed batch is already back in the queue, so there is nothing to report.
+  function background(urgent = false): void {
+    flush(urgent).catch(() => {})
+  }
+
+  const timer = globalThis.setInterval(() => background(), options.flushInterval ?? 5000)
 
   function track(name: string, properties?: EngagementProperties, eventOptions: TrackOptions = {}): void {
-    if (options.consent && !options.consent()) return
+    if (!consented()) return
 
     const event: EngagementEvent = {
       name,
@@ -56,21 +83,53 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
     if (properties && Object.keys(properties).length > 0) event.properties = properties
 
     queue.push(event)
-    if (queue.length >= batchSize) void flush()
+    deliver((destination) => (name === 'page.view' ? destination.page?.(event) : destination.track?.(event)))
+    if (queue.length >= batchSize) background()
   }
 
   function page(properties?: EngagementProperties): void {
     track('page.view', properties)
   }
 
-  async function flush(useBeacon = false): Promise<void> {
-    if (flushing) return flushing
+  function identify(person: EngagementPerson): void {
+    if (!consented()) return
+    deliver((destination) => destination.identify?.(person))
+  }
+
+  function reset(): void {
+    deliver((destination) => destination.reset?.())
+  }
+
+  const withText = typeof options.autoLinkClicks !== 'object' || options.autoLinkClicks.text
+
+  const onClick = (event: Event) => {
+    const link = event.target instanceof Element ? event.target.closest('a') : null
+    if (!link?.href) return
+    const properties: EngagementProperties = {
+      destination: link.origin + link.pathname,
+      outbound: link.origin !== originOf(browserLocation?.href),
+    }
+    if (withText) properties.label = (link.textContent ?? '').trim().slice(0, 200)
+    track('link.clicked', properties)
+    background(true)
+  }
+
+  if (options.autoLinkClicks) browserDocument?.addEventListener('click', onClick)
+
+  /** An urgent flush does not wait for a request in flight: the page may be closing. */
+  async function flush(urgent = false): Promise<void> {
+    if (!options.endpoint) {
+      queue.length = 0
+      return
+    }
+    if (flushing && !urgent) return flushing
     if (queue.length === 0) return
+    const endpoint = options.endpoint
 
     const events = queue.splice(0, batchSize)
     const body = JSON.stringify({ site_key: options.siteKey, events })
 
-    if (useBeacon && browserNavigator?.sendBeacon?.(options.endpoint, new Blob([body], { type: 'application/json' }))) {
+    if (urgent && browserNavigator?.sendBeacon?.(endpoint, new Blob([body], { type: 'application/json' }))) {
       return
     }
 
@@ -79,11 +138,11 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
       throw new Error('No fetch implementation is available')
     }
 
-    flushing = fetcher(options.endpoint, {
+    const request = fetcher(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Engagement-Site-Key': options.siteKey,
+        'X-Engagement-Site-Key': options.siteKey ?? '',
       },
       body,
       keepalive: true,
@@ -93,21 +152,31 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
       queue.unshift(...events)
       throw error
     }).finally(() => {
-      flushing = undefined
+      if (flushing === request) flushing = undefined
     })
 
-    return flushing
+    flushing = request
+    return request
   }
 
   async function destroy(): Promise<void> {
     globalThis.clearInterval(timer)
     browserDocument?.removeEventListener('visibilitychange', onVisibilityChange)
+    browserDocument?.removeEventListener('click', onClick)
     await flush()
   }
 
   if (options.autoPageViews !== false) page()
 
-  return { page, track, flush, destroy }
+  return { page, track, identify, reset, flush, destroy }
+}
+
+function originOf(href: string | undefined): string | undefined {
+  try {
+    return href ? new URL(href).origin : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function persistentId(storage: Pick<Storage, 'getItem' | 'setItem'> | undefined, key: string, crypto: Pick<Crypto, 'randomUUID' | 'getRandomValues'> | undefined): string {
