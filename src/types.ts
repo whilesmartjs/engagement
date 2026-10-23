@@ -70,6 +70,10 @@ export interface EngagementClient {
   track(name: string, properties?: EngagementProperties, options?: TrackOptions): void
   identify(person: EngagementPerson): void
   reset(): void
+  /** The random id this browser keeps across visits, stamped on every event. */
+  visitorId(): string
+  /** The random id of the current browser session, stamped on every event. */
+  sessionId(): string
   flush(useBeacon?: boolean): Promise<void>
   destroy(): Promise<void>
 }
