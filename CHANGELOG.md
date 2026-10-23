@@ -2,7 +2,7 @@
 
 All notable changes to the WhileSmart engagement client are documented in this file.
 
-## [Unreleased]
+## [0.3.0] - 2026-10-23
 
 ### Added
 - `visitorId()` and `sessionId()` return the ids the client stamps on its events, so a host can link a browser visitor to an account after sign-in
