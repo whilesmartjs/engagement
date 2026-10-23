@@ -63,6 +63,19 @@ others.
 
 The site key identifies a website. It is not a secret. The server must also restrict accepted browser origins.
 
+## Linking a visitor to an account
+
+The client gives each browser a random visitor id and each session a random
+session id, and stamps both on every event. Neither is personal data. After
+sign-in, the host posts the visitor id to its own authenticated route, so the
+server can attribute that visitor's events to the account:
+
+```ts
+await api.post('/api/engagement/identify', { visitor_id: engagement.visitorId() })
+```
+
+`sessionId()` returns the current session id the same way.
+
 ## License
 
 MIT. WhileSmart LTD.

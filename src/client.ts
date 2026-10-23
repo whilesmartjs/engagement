@@ -168,7 +168,7 @@ export function createEngagementClient(options: EngagementClientOptions): Engage
 
   if (options.autoPageViews !== false) page()
 
-  return { page, track, identify, reset, flush, destroy }
+  return { page, track, identify, reset, visitorId: () => visitorId, sessionId: () => sessionId, flush, destroy }
 }
 
 function originOf(href: string | undefined): string | undefined {

@@ -78,3 +78,25 @@ test('restores a failed batch for a later retry', async () => {
 
   assert.equal(attempts, 2)
 })
+
+test('exposes the visitor and session ids it stamps on events', async () => {
+  const requests = []
+  let next = 0
+  const client = createEngagementClient(clientOptions(async (url, init) => {
+    requests.push(JSON.parse(init.body))
+    return { ok: true, status: 202 }
+  }, { crypto: { randomUUID: () => `id-${++next}`, getRandomValues: (value) => value } }))
+
+  const visitor = client.visitorId()
+  const session = client.sessionId()
+  assert.notEqual(visitor, session)
+  assert.equal(client.visitorId(), visitor)
+  assert.equal(client.sessionId(), session)
+
+  client.track('signup.started')
+  await client.flush()
+  await client.destroy()
+
+  assert.equal(requests[0].events[0].visitor_id, visitor)
+  assert.equal(requests[0].events[0].session_id, session)
+})
