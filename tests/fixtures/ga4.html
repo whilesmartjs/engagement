@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'none'">
+  <title>GA4 destination browser test</title>
+</head>
+<body>
+  <pre id="result">Running</pre>
+  <script type="module">
+    import { createEngagementClient } from '../../dist/index.js'
+    import { ga4Destination } from '../../dist/ga4.js'
+
+    const result = document.querySelector('#result')
+    const clients = []
+    function assert(condition, message) {
+      if (!condition) throw new Error(message)
+    }
+    function tags() {
+      return [...document.scripts].filter((script) => script.src.startsWith('https://www.googletagmanager.com/gtag/js'))
+    }
+    try {
+      const existing = new URL(location.href).searchParams.has('existing')
+      if (existing) {
+        const script = document.createElement('script')
+        script.type = 'application/json'
+        script.src = 'https://www.googletagmanager.com/gtag/js?id=G-EXISTING'
+        document.head.appendChild(script)
+        window.dataLayer = []
+        window.gtag = function () { window.dataLayer.push(arguments) }
+      }
+      let consent = false
+      const client = createEngagementClient({
+        consent: () => consent,
+        location: { href: 'https://example.test/pricing?email=private#account', search: '' },
+        destinations: [ga4Destination({ measurementId: 'G-EXAMPLE' })],
+      })
+      clients.push(client)
+      assert(tags().length === (existing ? 1 : 0), 'No script before consent')
+      assert(!window.dataLayer?.length, 'No commands before consent')
+      consent = true
+      client.page()
+      const calls = window.dataLayer.map((command) => [...command])
+      assert(tags().length === 1, 'One tag script')
+      assert(existing || tags()[0].async, 'Tag loads asynchronously')
+      assert(existing || calls[0][0] === 'js', 'Standard tag initialization')
+      assert(calls.at(-2)[0] === 'config' && calls.at(-2)[2].send_page_view === false, 'Automatic page view disabled')
+      assert(calls.at(-1)[1] === 'page_view', 'Page view queued after config')
+      assert(calls.at(-1)[2].page_location === 'https://example.test/pricing', 'No query string or fragment')
+      const second = createEngagementClient({
+        location: { href: 'https://example.test/next', search: '' },
+        destinations: [ga4Destination({ measurementId: 'G-SECOND' })],
+      })
+      clients.push(second)
+      assert(tags().length === 1, 'Multiple streams reuse the script')
+      const before = window.dataLayer.length
+      consent = false
+      client.page()
+      assert(window.dataLayer.length === before, 'No page view after consent withdrawn')
+      result.textContent = `Passed: ${existing ? 'existing tag' : 'new tag'}, consent, queue, page views, script reuse`
+    } catch (error) {
+      result.textContent = `Failed: ${error.message}`
+      throw error
+    } finally {
+      await Promise.all(clients.map((client) => client.destroy()))
+    }
+  </script>
+</body>
+</html>
