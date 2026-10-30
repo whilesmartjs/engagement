@@ -2,6 +2,12 @@
 
 All notable changes to the WhileSmart engagement client are documented in this file.
 
+## [0.4.0] - 2026-10-30
+
+### Added
+- Google Analytics 4 page views through an optional destination, with consent gating and Google tag reuse
+- Page and referrer URLs omit query strings and fragments; custom events and identities are not forwarded
+
 ## [0.3.0] - 2026-10-23
 
 ### Added
