@@ -13,6 +13,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./ga4": {
+      "types": "./dist/ga4.d.ts",
+      "import": "./dist/ga4.js"
+    },
     "./posthog": {
       "types": "./dist/posthog.d.ts",
       "import": "./dist/posthog.js"
